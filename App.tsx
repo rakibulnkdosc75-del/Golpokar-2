@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -6,9 +7,9 @@ import HistoryPanel from './components/HistoryPanel';
 import { StorySettings, StoryType, Genre, Topic, StoryState, WritingStyle, StoryHistoryItem, Theme } from './types';
 import { generateStoryStream, StoryGenerationError, ERROR_CODES } from './services/gemini';
 
-const STORAGE_KEY = 'golpakar_draft_v6_offline';
-const HISTORY_KEY = 'golpakar_history_v5_offline';
-const THEME_KEY = 'golpakar_theme_v2';
+const STORAGE_KEY = 'golpakar_draft_v7_final';
+const HISTORY_KEY = 'golpakar_history_v6_final';
+const THEME_KEY = 'golpakar_theme_v3';
 
 const DEFAULT_SETTINGS: StorySettings = {
   title: '',
@@ -41,7 +42,6 @@ const App: React.FC = () => {
   const initialLoadRef = useRef(false);
   const saveTimeoutRef = useRef<number | null>(null);
 
-  // Monitor Network Status with high fidelity
   useEffect(() => {
     const handleStatusChange = () => {
       const online = navigator.onLine;
@@ -49,7 +49,7 @@ const App: React.FC = () => {
       if (!online) {
         setStoryState(prev => ({ 
           ...prev, 
-          error: "ইন্টারনেট সংযোগ বিচ্ছিন্ন। আপনি অফলাইনেও লিখতে পারবেন, যা স্বয়ংক্রিয়ভাবে সেভ হবে।", 
+          error: "ইন্টারনেট নেই। আপনি অফলাইনে ড্রাফট লিখতে পারবেন যা ব্রাউজারে সেভ হবে।", 
           errorCode: ERROR_CODES.NETWORK_ISSUE 
         }));
       } else {
@@ -65,13 +65,11 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Theme Persistence
   useEffect(() => {
     localStorage.setItem(THEME_KEY, theme);
     document.documentElement.className = theme === 'dark' ? 'dark-mode' : theme === 'sepia' ? 'sepia-mode' : '';
   }, [theme]);
 
-  // Load persistence on Mount
   useEffect(() => {
     const savedDraft = localStorage.getItem(STORAGE_KEY);
     if (savedDraft) {
@@ -90,15 +88,22 @@ const App: React.FC = () => {
     }
     initialLoadRef.current = true;
     
-    // Register Service Worker for true offline support
+    // SAFE SERVICE WORKER REGISTRATION (Avoids Invalid URL/Origin errors in sandboxed iframes)
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js', { scope: './' })
-        .then(reg => console.log('Offline engine registered:', reg.scope))
-        .catch(err => console.log('SW registration failed:', err));
+      try {
+        // Use simple relative path to avoid "Invalid URL" constructor issues
+        navigator.serviceWorker.register('sw.js')
+          .then(reg => console.debug('Offline Engine Ready:', reg.scope))
+          .catch(err => {
+            // Log as debug to prevent origin mismatch noise in dev consoles
+            console.debug('Service Worker restricted or blocked in this environment (likely due to sandbox):', err);
+          });
+      } catch (e) {
+        console.debug('Service Worker not supported or restricted.');
+      }
     }
   }, []);
 
-  // Robust Auto-Save (Essential for offline reliability)
   useEffect(() => {
     if (!initialLoadRef.current) return;
     
@@ -111,15 +116,13 @@ const App: React.FC = () => {
         setSaveStatus('saved');
         saveTimeoutRef.current = window.setTimeout(() => setSaveStatus('idle'), 2000);
       } catch (e) {
-        console.error("Local storage sync failed", e);
         setSaveStatus('idle');
       }
-    }, 1000);
+    }, 800);
 
     return () => { if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current); };
   }, [settings, storyState.content]);
 
-  // Sync History to Disk
   useEffect(() => {
     if (!initialLoadRef.current) return;
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
@@ -150,6 +153,7 @@ const App: React.FC = () => {
   };
 
   const loadFromHistory = (item: StoryHistoryItem) => {
+    if (storyState.content.trim() && !window.confirm("বর্তমান লেখাটি মুছে আর্কাইভ থেকে লোড করবেন?")) return;
     setSettings(item.settings);
     setStoryState({ content: item.content, isGenerating: false, error: null });
     setIsHistoryOpen(false);
@@ -161,10 +165,11 @@ const App: React.FC = () => {
 
   const handleStop = useCallback(() => {
     if (abortControllerRef.current) abortControllerRef.current.abort();
+    setStoryState(prev => ({ ...prev, isGenerating: false }));
   }, []);
 
   const handleReset = useCallback(() => {
-    if (window.confirm("বর্তমান গল্পটি কি পুরোপুরি মুছে ফেলতে চান? এটি আর ফিরে পাওয়া যাবে না।")) {
+    if (window.confirm("সব লেখা মুছে নতুন গল্প শুরু করবেন? এটি ফিরে পাওয়া যাবে না।")) {
       setSettings(DEFAULT_SETTINGS);
       setStoryState({ content: '', isGenerating: false, error: null });
     }
@@ -176,7 +181,7 @@ const App: React.FC = () => {
     if (!isOnline) {
       setStoryState(prev => ({ 
         ...prev, 
-        error: "আপনি অফলাইনে আছেন। নতুন গল্প তৈরির জন্য ইন্টারনেট সংযোগ প্রয়োজন। তবে আপনি নিজেই লেখা চালিয়ে যেতে পারেন।", 
+        error: "আপনি অফলাইনে আছেন। গল্প তৈরি করতে ইন্টারনেট প্রয়োজন।", 
         errorCode: ERROR_CODES.NETWORK_ISSUE 
       }));
       return;
@@ -211,13 +216,13 @@ const App: React.FC = () => {
       setStoryState(prev => ({
         ...prev,
         isGenerating: false,
-        error: err.message || "গল্প তৈরিতে ত্রুটি হয়েছে।",
+        error: err.message || "ত্রুটি হয়েছে। পুনরায় চেষ্টা করুন।",
         errorCode: err.code || ERROR_CODES.UNKNOWN
       }));
     }
   }, [settings, storyState.isGenerating, storyState.content, addToHistory, updateLatestHistory, isOnline]);
 
-  const containerThemeClass = theme === 'dark' ? 'bg-slate-950 text-slate-200' : theme === 'sepia' ? 'bg-[#fdf9f0] text-[#5b4636]' : 'bg-slate-50 text-slate-900';
+  const containerThemeClass = theme === 'dark' ? 'bg-slate-950 text-slate-100' : theme === 'sepia' ? 'bg-[#fdf9f0] text-[#5b4636]' : 'bg-slate-50 text-slate-900';
 
   return (
     <div className={`flex flex-col h-screen overflow-hidden font-bengali transition-colors duration-500 ${containerThemeClass}`}>
@@ -253,19 +258,14 @@ const App: React.FC = () => {
         />
 
         {storyState.error && (
-          <div className={`fixed bottom-24 right-4 z-[100] max-w-sm p-6 rounded-2xl shadow-2xl border-l-4 border-rose-500 animate-in slide-in-from-right-full duration-500 ${theme === 'dark' ? 'bg-slate-900 text-slate-100' : 'bg-white text-slate-800'}`}>
+          <div className={`fixed bottom-24 right-4 z-[100] max-w-sm p-6 rounded-3xl shadow-2xl border-l-4 border-rose-500 animate-in slide-in-from-right-full duration-500 ${theme === 'dark' ? 'bg-slate-900 text-slate-100' : 'bg-white text-slate-800'}`}>
             <div className="flex justify-between items-start mb-2">
               <h3 className="font-black text-rose-500 uppercase text-[10px] tracking-widest">বিজ্ঞপ্তি</h3>
-              <button onClick={() => setStoryState(p => ({...p, error: null}))} className="text-slate-400 hover:text-slate-600 p-1">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/></svg>
+              <button onClick={() => setStoryState(p => ({...p, error: null}))} className="text-slate-400 hover:text-slate-600 p-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
             </div>
             <p className="text-sm font-bold leading-relaxed">{storyState.error}</p>
-            {isOnline && storyState.errorCode !== ERROR_CODES.NETWORK_ISSUE && (
-              <div className="mt-4 flex justify-end">
-                <button onClick={() => handleGenerate(storyState.content.length > 0)} className="text-[10px] font-black uppercase text-indigo-500 hover:underline tracking-widest">আবার চেষ্টা করুন</button>
-              </div>
-            )}
           </div>
         )}
       </main>
