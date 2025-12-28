@@ -23,27 +23,27 @@ export class StoryGenerationError extends Error {
 const getStyleInstruction = (style: WritingStyle) => {
   switch (style) {
     case WritingStyle.CLASSIC:
-      return "Use a classic, formal Bengali literary style (Sadhubhasha elements or high-standard Cholitobhasha). Rich vocabulary and complex sentence structures.";
+      return "বিশুদ্ধ ও ধ্রুপদী বাংলা সাহিত্যিক শৈলী। বঙ্কিমচন্দ্র বা শরৎচন্দ্রীয় গাম্ভীর্যপূর্ণ বর্ণনাভঙ্গি।";
     case WritingStyle.MODERN:
-      return "Use a modern, contemporary, and conversational Bengali style (Cholitobhasha). Natural dialogues and accessible language.";
+      return "আধুনিক ও সমসাময়িক চলিত বাংলা। ঝরঝরে ভাষা এবং জীবনমুখী বর্ণনা।";
     case WritingStyle.POETIC:
-      return "Use a poetic, metaphorical, and rhythmic prose style. Focus on vivid imagery.";
+      return "কাব্যিক ও রূপকধর্মী গদ্য। ছান্দিক বর্ণনা এবং গভীর আবেগপূর্ণ শব্দচয়ন।";
     case WritingStyle.DRAMATIC:
-      return "Use a high-tension, dramatic style with sharp dialogues and intense emotional beats.";
+      return "নাটকীয় মোড় এবং সংলাপ প্রধান কাহিনী। উত্তেজনাপূর্ণ এবং দ্রুত গতির বর্ণনা।";
     case WritingStyle.HUMOROUS:
-      return "Use a light-hearted, witty, and funny writing style. Focus on clever wordplay.";
+      return "রসময় ও কৌতুকপূর্ণ ভঙ্গি। বুদ্ধিদীপ্ত হাস্যরস এবং ব্যঙ্গাত্মক পরিস্থিতি।";
     case WritingStyle.SATIRICAL:
-      return "Use a sharp, satirical style. Employ irony and sarcasm to critique society.";
+      return "তীক্ষ্ণ ব্যঙ্গ এবং শ্লেষাত্মক বর্ণনা। সামাজিক অসংগতির শৈল্পিক রূপায়ন।";
     case WritingStyle.HISTORICAL:
-      return "Use a period-appropriate historical style with archaic Bengali terms.";
+      return "ঐতিহাসিক গাম্ভীর্য এবং তৎকালীন ভাষাভঙ্গি। ঐতিহাসিক শব্দভাণ্ডারের সার্থক ব্যবহার।";
     default:
-      return "High-quality Bengali literature style.";
+      return "উন্নতমানের আধুনিক বাংলা সাহিত্যিক শৈলী।";
   }
 };
 
 const getRelevantContext = (content: string, maxChars = 12000) => {
   if (content.length <= maxChars) return content;
-  return "[...পুরানো অংশ...] " + content.slice(-maxChars);
+  return "[...গল্পের আগের অংশ...] " + content.slice(-maxChars);
 };
 
 export const generateStoryStream = async (
@@ -54,46 +54,53 @@ export const generateStoryStream = async (
 ) => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    throw new StoryGenerationError("API Key missing.", ERROR_CODES.MISSING_API_KEY);
+    throw new StoryGenerationError("সিস্টেম ত্রুটি: এপিআই কী পাওয়া যায়নি।", ERROR_CODES.MISSING_API_KEY);
   }
 
   const ai = new GoogleGenAI({ apiKey });
   
   const continuityInstruction = settings.continuityMode === 'strict' 
-    ? "Maintain strict continuity. Do NOT contradict established plot points, character names, or settings from previous sections. Logic and consistency are paramount."
-    : "Feel free to take creative liberties. You can introduce unexpected twists or evolve the story in surprising ways even if it deviates from a linear path.";
+    ? "পূর্ববর্তী কাহিনীর ধারা, চরিত্রের নাম এবং প্রেক্ষাপট নিখুঁতভাবে বজায় রাখুন। কোনো অসংগতি বা যুক্তিহীনতা যেন না থাকে।"
+    : "কাহিনীতে নতুন চমক আনুন। প্রয়োজনে মূল প্রেক্ষাপট থেকে কিছুটা সরে গিয়ে নতুন মোড় সৃষ্টি করুন।";
 
   const matureInstruction = settings.isMature 
-    ? "TARGET AUDIENCE: 18+ (Adults). You are granted full artistic freedom to explore mature, graphic, and intense human themes. This includes romantic intimacy, psychological darkness, social realism, and complex adult relationships. Do not censor mature content; instead, treat it with literary depth and narrative purpose. Focus on raw human emotions and uncensored storytelling." 
-    : "TARGET AUDIENCE: General. Ensure the content remains strictly family-friendly, avoiding any explicit, graphic, or mature themes.";
+    ? "টার্গেট অডিয়েন্স: ১৮+ (প্রাপ্তবয়স্ক)। আপনি একজন আধুনিক ও সাহসী লেখক হিসেবে মানুষের নিবিড় সম্পর্ক, মনস্তাত্ত্বিক জটিলতা, রূঢ় বাস্তবতা এবং প্রাপ্তবয়স্কদের উপযোগী বিষয়গুলো শৈল্পিকভাবে ফুটিয়ে তুলুন। সেন্সরশিপের ভয় না রেখে গভীর আবেগ ও শরীরী আবেদনের চিত্রায়ন করুন।" 
+    : "টার্গেট অডিয়েন্স: সাধারণ। কাহিনী সম্পূর্ণ শালীন এবং পরিবারবান্ধব রাখুন। কোনো প্রাপ্তবয়স্ক বা অশালীন বিষয় সম্পূর্ণ বর্জন করুন।";
 
-  const systemInstruction = `You are an acclaimed, world-class Bengali novelist and storyteller. 
-  Your writing quality should match that of legendary Bengali authors.
-  Style: ${getStyleInstruction(settings.style)}
-  Continuity: ${continuityInstruction}
-  Maturity: ${matureInstruction}
-  Language: Bengali (বাংলা).
-  Task: Respond ONLY with the story text. No preamble, no postamble, no meta-talk.`;
+  const systemInstruction = `আপনি একজন শ্রেষ্ঠ বাংলা কথাসাহিত্যিক এবং আধুনিক গল্পকার। 
+  আপনার লেখনীতে শিল্পের ছোঁয়া এবং ভাষাগত মাধুর্য থাকতে হবে।
+  শৈলী: ${getStyleInstruction(settings.style)}
+  ধারাবাহিকতা: ${continuityInstruction}
+  ম্যাচিউরিটি: ${matureInstruction}
+  ভাষা: মানসম্মত বাংলা (Cholitobhasha)।
+  কাজ: শুধুমাত্র গল্পের মূল অংশটি প্রদান করুন। কোনো ভূমিকা বা বাড়তি কথা বলবেন না।`;
 
   const context = existingContent ? getRelevantContext(existingContent) : "";
   
   const prompt = existingContent 
-    ? `Title: "${settings.title || "গল্প"}"
-       Context: This is a continuation of a ${settings.type}. 
-       Instructions: Write the next part of the story. Do NOT start from the beginning. Start exactly where the previous text ended. 
-       ${settings.plotHint ? `Next Plot Point: ${settings.plotHint}` : ''}
+    ? `শিরোনাম: "${settings.title || "গল্প"}"
+       কাজ: নিচের পূর্ববর্তী অংশের পর থেকে কাহিনীটি সাবলীলভাবে এগিয়ে নিয়ে যান। পুনরাবৃত্তি করবেন না।
        
-       --- START PREVIOUS PART ---
+       --- আগের অংশ শুরু ---
        ${context}
-       --- END PREVIOUS PART ---
+       --- আগের অংশ শেষ ---
        
-       CONTINUE STORY NOW:`
-    : `Title: "${settings.title || "নতুন গল্প"}"
-       Task: Write a new ${settings.type} in the ${settings.genre} genre. 
-       ${settings.plotHint ? `Plot Details: ${settings.plotHint}` : ''}
-       Desired Length: ${settings.length}. 
+       পরবর্তী অংশ এখান থেকে শুরু করুন:`
+    : `শিরোনাম: "${settings.title || "নতুন গল্প"}"
+       ধরন: ${settings.type}
+       জনরা: ${settings.genre}
+       দৈর্ঘ্য: ${settings.length}
+       প্রেক্ষাপট: ${settings.plotHint || "একটি চমৎকার গল্পের অবতারণা করুন।"}
        
-       START WRITING STORY NOW:`;
+       গল্পের সূচনা এখান থেকে:`
+
+  // Config with relaxed safety for mature mode
+  const safetySettings = settings.isMature ? [
+    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' }
+  ] : undefined;
 
   try {
     const result = await ai.models.generateContentStream({
@@ -103,7 +110,8 @@ export const generateStoryStream = async (
         systemInstruction,
         temperature: settings.continuityMode === 'strict' ? 0.7 : 0.9,
         topP: 0.95,
-        thinkingConfig: { thinkingBudget: 4000 } // Allocate thinking budget for deep narrative planning
+        thinkingConfig: { thinkingBudget: 12000 },
+        safetySettings
       },
     });
 
@@ -114,21 +122,17 @@ export const generateStoryStream = async (
     }
   } catch (error: any) {
     if (signal?.aborted) return;
-    console.error("Gemini Error:", error);
     
-    let message = "গল্প তৈরি করতে সমস্যা হয়েছে।";
+    let message = "দুঃখিত, গল্প তৈরিতে সমস্যা হয়েছে।";
     let code = ERROR_CODES.UNKNOWN;
     const errStr = (error?.message || "").toLowerCase();
     
     if (errStr.includes("safety")) { 
-      message = "নিরাপত্তা ফিল্টারের কারণে কন্টেন্ট জেনারেট করা সম্ভব হয়নি। অ্যাডাল্ট সেটিং অন থাকলেও কিছু অত্যন্ত সংবেদনশীল শব্দ এড়িয়ে চলার চেষ্টা করুন।"; 
+      message = "নিরাপত্তা ফিল্টারের কারণে কন্টেন্ট ব্লক করা হয়েছে। দয়া করে প্রেক্ষাপট কিছুটা পরিবর্তন করুন।"; 
       code = ERROR_CODES.SAFETY_BLOCKED; 
     } else if (errStr.includes("quota") || errStr.includes("429")) { 
-      message = "সার্ভারের ওপর অনেক বেশি চাপ পড়ছে। অনুগ্রহ করে ১-২ মিনিট অপেক্ষা করে পুনরায় চেষ্টা করুন।"; 
+      message = "সার্ভারে অত্যধিক ট্রাফিক। অনুগ্রহ করে কিছুক্ষণ পর পুনরায় চেষ্টা করুন।"; 
       code = ERROR_CODES.QUOTA_EXCEEDED; 
-    } else if (errStr.includes("network") || errStr.includes("fetch")) {
-      message = "আপনার ইন্টারনেট সংযোগের সমস্যা দেখা দিচ্ছে। দয়া করে সংযোগটি পুনরায় চেক করুন।";
-      code = ERROR_CODES.NETWORK_ISSUE;
     }
     
     throw new StoryGenerationError(message, code);

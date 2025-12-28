@@ -1,5 +1,10 @@
 {
-  "name": "গল্পকার (Golpakar) - AI Bengali Story Generator",
-  "description": "A powerful and fast AI-driven application for generating high-quality Bengali stories, novels (Uponnash), and long stories (Boro Golpo) with customizable genres and an optional mature content setting.",
+  "name": "গল্পকার (Golpakar)",
+  "short_name": "গল্পকার",
+  "description": "বিশ্বমানের এআই চালিত বাংলা গল্প ও উপন্যাস তৈরির অ্যাপ।",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#4f46e5",
   "requestFramePermissions": []
 }

@@ -7,20 +7,22 @@ import HistoryPanel from './components/HistoryPanel';
 import { StorySettings, StoryType, Genre, StoryState, WritingStyle, StoryHistoryItem } from './types';
 import { generateStoryStream, StoryGenerationError, ERROR_CODES } from './services/gemini';
 
-const STORAGE_KEY = 'golpakar_draft_v2';
-const HISTORY_KEY = 'golpakar_history_v1';
+const STORAGE_KEY = 'golpakar_draft_v3';
+const HISTORY_KEY = 'golpakar_history_v2';
+
+const DEFAULT_SETTINGS: StorySettings = {
+  title: '',
+  type: StoryType.SHORT_STORY,
+  genre: Genre.SOCIAL,
+  style: WritingStyle.MODERN,
+  isMature: false,
+  length: 'medium',
+  plotHint: '',
+  continuityMode: 'strict',
+};
 
 const App: React.FC = () => {
-  const [settings, setSettings] = useState<StorySettings>({
-    title: '',
-    type: StoryType.SHORT_STORY,
-    genre: Genre.SOCIAL,
-    style: WritingStyle.MODERN,
-    isMature: false,
-    length: 'medium',
-    plotHint: '',
-    continuityMode: 'strict',
-  });
+  const [settings, setSettings] = useState<StorySettings>(DEFAULT_SETTINGS);
 
   const [storyState, setStoryState] = useState<StoryState>({
     content: '',
@@ -36,6 +38,7 @@ const App: React.FC = () => {
   const initialLoadRef = useRef(false);
   const saveTimeoutRef = useRef<number | null>(null);
 
+  // Load state on mount
   useEffect(() => {
     const savedDraft = localStorage.getItem(STORAGE_KEY);
     if (savedDraft) {
@@ -55,6 +58,7 @@ const App: React.FC = () => {
     initialLoadRef.current = true;
   }, []);
 
+  // Auto-save debounced
   useEffect(() => {
     if (!initialLoadRef.current) return;
     setSaveStatus('saving');
@@ -62,13 +66,12 @@ const App: React.FC = () => {
     if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = window.setTimeout(() => {
       setSaveStatus('saved');
-      saveTimeoutRef.current = window.setTimeout(() => {
-        setSaveStatus('idle');
-      }, 2000);
-    }, 1000);
+      saveTimeoutRef.current = window.setTimeout(() => setSaveStatus('idle'), 2000);
+    }, 1500);
     return () => { if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current); };
   }, [settings, storyState.content]);
 
+  // Sync History
   useEffect(() => {
     if (!initialLoadRef.current) return;
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
@@ -82,7 +85,7 @@ const App: React.FC = () => {
       content: content.trim(),
       settings: { ...storySettings }
     };
-    setHistory(prev => [newItem, ...prev.slice(0, 49)]);
+    setHistory(prev => [newItem, ...prev.slice(0, 99)]);
   }, []);
 
   const updateLatestHistory = useCallback((content: string) => {
@@ -110,18 +113,23 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const handleReset = useCallback(() => {
+    if (window.confirm("আপনি কি নিশ্চিত যে বর্তমান ড্রাফটটি মুছে ফেলতে চান? আপনার সেভ করা ইতিবৃত্ত অক্ষুণ্ণ থাকবে।")) {
+      setSettings(DEFAULT_SETTINGS);
+      setStoryState({ content: '', isGenerating: false, error: null });
+    }
+  }, []);
+
   const getErrorAdvice = (code?: string) => {
     switch (code) {
       case ERROR_CODES.SAFETY_BLOCKED:
-        return "পরামর্শ: আপনার গল্পের প্রেক্ষাপটে (Plot Hint) সম্ভবত এমন কিছু শব্দ রয়েছে যা AI-এর নিরাপত্তা ফিল্টারে আটকে যাচ্ছে। দয়া করে সংবেদনশীল বা খুব বেশি গ্রাফিক শব্দ পরিবর্তন করে পুনরায় চেষ্টা করুন। ১৮+ সেটিং অন থাকলেও কিছু ক্ষেত্রে অত্যন্ত সংবেদনশীল কন্টেন্ট জেনারেট করা সম্ভব হয় না।";
+        return "গোপনীয়তা বা নিরাপত্তা ফিল্টার আপনার অনুরোধটি গ্রহণ করতে পারছে না। কাহিনীর প্রেক্ষাপট বা সংলাপে থাকা সংবেদনশীল শব্দগুলো পরিবর্তন করে দেখুন। ১৮+ মুড অন থাকলে সাধারণত বাধা কম থাকে।";
       case ERROR_CODES.QUOTA_EXCEEDED:
-        return "পরামর্শ: এই মুহূর্তে অনেক বেশি ব্যবহারকারী গল্প জেনারেট করছেন। দয়া করে ৬০ সেকেন্ড অপেক্ষা করুন এবং তারপর পুনরায় চেষ্টা করুন। আপনার বর্তমান ড্রাফটটি সেভ করা আছে, তাই দুশ্চিন্তার কিছু নেই।";
-      case ERROR_CODES.MISSING_API_KEY:
-        return "পরামর্শ: সার্ভার কনফিগারেশনে সমস্যা। দয়া করে পেজটি একবার রিফ্রেশ দিন অথবা কিছুক্ষণ পর চেষ্টা করুন।";
+        return "সার্ভারের ক্ষমতা অতিক্রম করেছে। অনুগ্রহ করে ১-২ মিনিট বিরতি দিয়ে পুনরায় চেষ্টা করুন।";
       case ERROR_CODES.NETWORK_ISSUE:
-        return "পরামর্শ: আপনার ইন্টারনেট সংযোগের গতি ধীর অথবা বিচ্ছিন্ন। দয়া করে কানেকশন চেক করে পুনরায় চেষ্টা করুন।";
+        return "ইন্টারনেট সংযোগ চেক করুন এবং পেজটি একবার রিফ্রেশ দিয়ে চেষ্টা করুন।";
       default:
-        return "পরামর্শ: আপনার ব্রাউজারের ক্যাশ ক্লিয়ার করে অথবা গল্পের কিছু অংশ পরিবর্তন করে আবার চেষ্টা করে দেখুন।";
+        return "কিছুক্ষণ অপেক্ষা করে পুনরায় চেষ্টা করুন অথবা ব্রাউজারের ক্যাশ ক্লিয়ার করে দেখুন।";
     }
   };
 
@@ -140,13 +148,13 @@ const App: React.FC = () => {
     }));
 
     try {
-      let accumulated = isContinuation ? storyState.content : '';
+      let fullContentAccumulated = isContinuation ? storyState.content : '';
       
       await generateStoryStream(
         settings, 
         (chunk) => {
-          accumulated += chunk;
-          setStoryState(prev => ({ ...prev, content: accumulated }));
+          fullContentAccumulated += chunk;
+          setStoryState(prev => ({ ...prev, content: fullContentAccumulated }));
         },
         controller.signal,
         isContinuation ? storyState.content : undefined
@@ -155,9 +163,9 @@ const App: React.FC = () => {
       setStoryState(prev => ({ ...prev, isGenerating: false }));
       
       if (!isContinuation) {
-        addToHistory(accumulated, settings);
+        addToHistory(fullContentAccumulated, settings);
       } else {
-        updateLatestHistory(accumulated);
+        updateLatestHistory(fullContentAccumulated);
       }
       
     } catch (err: any) {
@@ -168,37 +176,45 @@ const App: React.FC = () => {
       setStoryState(prev => ({
         ...prev,
         isGenerating: false,
-        error: err instanceof StoryGenerationError ? err.message : "দুঃখিত, কোনো একটি সমস্যা হয়েছে।",
+        error: err instanceof StoryGenerationError ? err.message : "দুঃখিত, কোনো একটি ত্রুটি হয়েছে।",
         errorCode: err instanceof StoryGenerationError ? err.code : ERROR_CODES.UNKNOWN
       }));
     }
   }, [settings, storyState.isGenerating, storyState.content, addToHistory, updateLatestHistory]);
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
+    <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-bengali">
       <Header onOpenHistory={() => setIsHistoryOpen(true)} historyCount={history.length} saveStatus={saveStatus} />
       
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
         {storyState.error && (
-          <div className="fixed bottom-24 lg:bottom-10 right-4 lg:right-10 z-[100] max-w-sm w-[calc(100%-2rem)] bg-white border-l-4 border-red-500 p-6 rounded-r-3xl shadow-[0_30px_60px_rgba(0,0,0,0.3)] animate-in slide-in-from-right duration-500">
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center space-x-3 text-red-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                <h3 className="font-black text-base uppercase tracking-tight">সতর্কবার্তা (Alert)</h3>
+          <div className="fixed bottom-24 lg:bottom-12 right-4 lg:right-12 z-[100] max-w-md w-[calc(100%-2rem)] bg-white border-l-8 border-red-500 p-8 rounded-r-3xl shadow-[0_40px_80px_rgba(0,0,0,0.35)] animate-in slide-in-from-right duration-500">
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex items-center space-x-4 text-red-600">
+                <div className="bg-red-50 p-2 rounded-full">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <h3 className="font-black text-xl uppercase tracking-tight">সতর্কবার্তা</h3>
               </div>
-              <button onClick={() => setStoryState(p => ({...p, error: null}))} className="text-slate-400 hover:text-slate-600 transition-colors p-1">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              <button onClick={() => setStoryState(p => ({...p, error: null}))} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-all">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            <p className="text-sm font-bold text-slate-900 leading-relaxed mb-4">{storyState.error}</p>
-            <div className="bg-red-50/80 p-4 rounded-2xl border border-red-100 mb-6">
-              <p className="text-xs text-red-800 font-bold leading-relaxed bengali-font">
+            
+            <p className="text-base font-bold text-slate-900 leading-relaxed mb-6">{storyState.error}</p>
+            
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 mb-8">
+              <p className="text-sm text-slate-700 font-medium leading-relaxed">
                 {getErrorAdvice(storyState.errorCode)}
               </p>
             </div>
+
             <div className="flex justify-between items-center">
-               <p className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-widest">ERROR ID: {storyState.errorCode}</p>
-               <button onClick={() => handleGenerate(storyState.content.length > 0)} className="text-[12px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest flex items-center space-x-2 bg-indigo-50 px-4 py-2 rounded-xl active:scale-95 transition-all">
+               <span className="text-[10px] text-slate-400 font-mono font-black uppercase tracking-widest">ID: {storyState.errorCode}</span>
+               <button 
+                 onClick={() => handleGenerate(storyState.content.length > 0)} 
+                 className="text-sm font-black text-indigo-600 hover:text-white uppercase tracking-widest flex items-center space-x-3 bg-indigo-50 hover:bg-indigo-600 px-6 py-3 rounded-2xl active:scale-95 transition-all shadow-sm border border-indigo-100"
+               >
                  <span>পুনরায় চেষ্টা</span>
                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                </button>
@@ -211,6 +227,7 @@ const App: React.FC = () => {
           setSettings={setSettings} 
           onGenerate={() => handleGenerate(false)}
           onStop={handleStop}
+          onReset={handleReset}
           isGenerating={storyState.isGenerating}
         />
 
