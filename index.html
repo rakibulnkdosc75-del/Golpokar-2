@@ -17,6 +17,20 @@
         .bengali-font {
             font-family: 'Noto Sans Bengali', sans-serif;
         }
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
     </style>
 <script type="importmap">
 {
@@ -34,5 +48,12 @@
 </head>
 <body>
     <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration failed:', err));
+        });
+      }
+    </script>
 </body>
 </html>

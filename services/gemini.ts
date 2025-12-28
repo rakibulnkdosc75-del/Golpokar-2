@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { StorySettings, WritingStyle } from "../types";
 
@@ -40,9 +41,6 @@ const getStyleInstruction = (style: WritingStyle) => {
   }
 };
 
-/**
- * Truncates content to fit within context window while keeping the most relevant part (the end).
- */
 const getRelevantContext = (content: string, maxChars = 12000) => {
   if (content.length <= maxChars) return content;
   return "[...পুরানো অংশ...] " + content.slice(-maxChars);
@@ -54,7 +52,6 @@ export const generateStoryStream = async (
   signal?: AbortSignal,
   existingContent?: string
 ) => {
-  // Always use process.env.API_KEY directly as per requirements
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
     throw new StoryGenerationError("API Key missing.", ERROR_CODES.MISSING_API_KEY);
@@ -67,33 +64,36 @@ export const generateStoryStream = async (
     : "Feel free to take creative liberties. You can introduce unexpected twists or evolve the story in surprising ways even if it deviates from a linear path.";
 
   const matureInstruction = settings.isMature 
-    ? "Target: Adults (18+). You are permitted to explore mature, complex, and dark themes where appropriate for the narrative. Maintain literary and artistic integrity. Focus on deep psychological realism and intense human emotions." 
-    : "Target: General audience. Ensure the content remains family-friendly, avoiding any explicit or highly sensitive themes.";
+    ? "TARGET AUDIENCE: 18+ (Adults). You are granted full artistic freedom to explore mature, graphic, and intense human themes. This includes romantic intimacy, psychological darkness, social realism, and complex adult relationships. Do not censor mature content; instead, treat it with literary depth and narrative purpose. Focus on raw human emotions and uncensored storytelling." 
+    : "TARGET AUDIENCE: General. Ensure the content remains strictly family-friendly, avoiding any explicit, graphic, or mature themes.";
 
-  const systemInstruction = `You are an acclaimed Bengali novelist and storyteller (Sahityik). 
-  Write high-quality, emotionally resonant literature in Bengali.
+  const systemInstruction = `You are an acclaimed, world-class Bengali novelist and storyteller. 
+  Your writing quality should match that of legendary Bengali authors.
   Style: ${getStyleInstruction(settings.style)}
-  Continuity Mode: ${continuityInstruction}
-  Safety & Audience: ${matureInstruction}
-  Respond ONLY with Bengali story text. No English. No conversational filler. No meta-commentary.`;
+  Continuity: ${continuityInstruction}
+  Maturity: ${matureInstruction}
+  Language: Bengali (বাংলা).
+  Task: Respond ONLY with the story text. No preamble, no postamble, no meta-talk.`;
 
   const context = existingContent ? getRelevantContext(existingContent) : "";
   
   const prompt = existingContent 
-    ? `You are writing a ${settings.type} titled "${settings.title || "গল্প"}". 
-       Below is the previous part of the story. Please CONTINUE the story seamlessly from where it left off. 
-       Do NOT repeat the existing text. Write the next logical segment.
-       ${settings.plotHint ? `Next direction/event: ${settings.plotHint}` : ''}
+    ? `Title: "${settings.title || "গল্প"}"
+       Context: This is a continuation of a ${settings.type}. 
+       Instructions: Write the next part of the story. Do NOT start from the beginning. Start exactly where the previous text ended. 
+       ${settings.plotHint ? `Next Plot Point: ${settings.plotHint}` : ''}
        
-       --- PREVIOUS PART ---
+       --- START PREVIOUS PART ---
        ${context}
-       --- END OF PREVIOUS PART ---
+       --- END PREVIOUS PART ---
        
-       CONTINUE NOW:`
-    : `Write a ${settings.type} titled "${settings.title || "নতুন গল্প"}" in the ${settings.genre} genre. 
-       ${settings.plotHint ? `Specific Context/Plot: ${settings.plotHint}` : ''}
-       Desired Story length: ${settings.length}. 
-       Begin the story now:`;
+       CONTINUE STORY NOW:`
+    : `Title: "${settings.title || "নতুন গল্প"}"
+       Task: Write a new ${settings.type} in the ${settings.genre} genre. 
+       ${settings.plotHint ? `Plot Details: ${settings.plotHint}` : ''}
+       Desired Length: ${settings.length}. 
+       
+       START WRITING STORY NOW:`;
 
   try {
     const result = await ai.models.generateContentStream({
@@ -101,8 +101,9 @@ export const generateStoryStream = async (
       contents: prompt,
       config: {
         systemInstruction,
-        temperature: settings.continuityMode === 'strict' ? 0.6 : 0.85,
+        temperature: settings.continuityMode === 'strict' ? 0.7 : 0.9,
         topP: 0.95,
+        thinkingConfig: { thinkingBudget: 4000 } // Allocate thinking budget for deep narrative planning
       },
     });
 
@@ -113,20 +114,20 @@ export const generateStoryStream = async (
     }
   } catch (error: any) {
     if (signal?.aborted) return;
-    console.error("Gemini Generation Error:", error);
+    console.error("Gemini Error:", error);
     
     let message = "গল্প তৈরি করতে সমস্যা হয়েছে।";
     let code = ERROR_CODES.UNKNOWN;
     const errStr = (error?.message || "").toLowerCase();
     
     if (errStr.includes("safety")) { 
-      message = "নিরাপত্তা ফিল্টারের কারণে কন্টেন্ট জেনারেট করা সম্ভব হয়নি। সম্ভবত কন্টেন্ট খুব বেশি স্পর্শকাতর হয়ে গিয়েছে।"; 
+      message = "নিরাপত্তা ফিল্টারের কারণে কন্টেন্ট জেনারেট করা সম্ভব হয়নি। অ্যাডাল্ট সেটিং অন থাকলেও কিছু অত্যন্ত সংবেদনশীল শব্দ এড়িয়ে চলার চেষ্টা করুন।"; 
       code = ERROR_CODES.SAFETY_BLOCKED; 
     } else if (errStr.includes("quota") || errStr.includes("429")) { 
-      message = "কোটা শেষ হয়ে গিয়েছে বা অনেক রিকোয়েস্ট পাঠানো হয়েছে। কিছুক্ষণ অপেক্ষা করে আবার চেষ্টা করুন।"; 
+      message = "সার্ভারের ওপর অনেক বেশি চাপ পড়ছে। অনুগ্রহ করে ১-২ মিনিট অপেক্ষা করে পুনরায় চেষ্টা করুন।"; 
       code = ERROR_CODES.QUOTA_EXCEEDED; 
     } else if (errStr.includes("network") || errStr.includes("fetch")) {
-      message = "নেটওয়ার্ক কানেকশনে সমস্যা হচ্ছে। দয়া করে আপনার ইন্টারনেট চেক করুন।";
+      message = "আপনার ইন্টারনেট সংযোগের সমস্যা দেখা দিচ্ছে। দয়া করে সংযোগটি পুনরায় চেক করুন।";
       code = ERROR_CODES.NETWORK_ISSUE;
     }
     
