@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { StorySettings, StoryType, Genre, WritingStyle } from '../types';
+import { StorySettings, StoryType, Genre, Topic, WritingStyle } from '../types';
 
 interface SidebarProps {
   settings: StorySettings;
@@ -104,6 +104,21 @@ const Sidebar: React.FC<SidebarProps> = ({ settings, setSettings, onGenerate, on
               ))}
             </select>
           </div>
+        </div>
+
+        <div>
+          <label htmlFor="topic" className="block text-sm font-semibold text-slate-700 mb-2">বিষয়/থিম (Theme/Topic)</label>
+          <select
+            id="topic"
+            name="topic"
+            value={settings.topic}
+            onChange={handleInputChange}
+            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none"
+          >
+            {Object.values(Topic).map(topic => (
+              <option key={topic} value={topic}>{topic}</option>
+            ))}
+          </select>
         </div>
 
         <div>

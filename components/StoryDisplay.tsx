@@ -182,6 +182,7 @@ const StoryDisplay: React.FC<StoryDisplayProps> = ({ content, isGenerating, sett
                   <div className="flex justify-center items-center flex-wrap gap-4">
                     <span className="bg-indigo-600 text-white text-[10px] font-black px-4 py-1.5 rounded-full shadow-lg shadow-indigo-600/20">{settings.type}</span>
                     <span className={`text-[10px] font-black px-4 py-1.5 rounded-full border ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-indigo-50 border-indigo-100 text-indigo-700'}`}>{settings.genre}</span>
+                    <span className={`text-[10px] font-black px-4 py-1.5 rounded-full border ${theme === 'dark' ? 'bg-emerald-900/40 border-emerald-800 text-emerald-400' : 'bg-emerald-50 border-emerald-100 text-emerald-700'}`}>{settings.topic}</span>
                   </div>
                 </header>
                 <div 

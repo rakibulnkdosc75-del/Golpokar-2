@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { StoryHistoryItem } from '../types';
 
@@ -20,8 +21,9 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ isOpen, onClose, history, o
       .filter((item) => {
         const titleMatch = (item.settings.title || "").toLowerCase().includes(term);
         const genreMatch = item.settings.genre.toLowerCase().includes(term);
+        const topicMatch = item.settings.topic.toLowerCase().includes(term);
         const contentMatch = item.content.toLowerCase().includes(term);
-        return titleMatch || genreMatch || contentMatch;
+        return titleMatch || genreMatch || topicMatch || contentMatch;
       })
       .sort((a, b) => b.timestamp - a.timestamp);
   }, [history, searchTerm]);
@@ -144,6 +146,9 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ isOpen, onClose, history, o
                         </span>
                         <span className="bg-indigo-600 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-sm">
                           {item.settings.genre.split(' ')[0]}
+                        </span>
+                        <span className="bg-emerald-600 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-sm">
+                          {item.settings.topic.split(' ')[0]}
                         </span>
                         {item.settings.isMature && (
                           <span className="bg-red-500 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider animate-pulse">

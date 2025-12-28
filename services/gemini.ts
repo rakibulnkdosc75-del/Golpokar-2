@@ -89,6 +89,7 @@ export const generateStoryStream = async (
     : `শিরোনাম: "${settings.title || "নতুন গল্প"}"
        ধরন: ${settings.type}
        জনরা: ${settings.genre}
+       থিম/বিষয়: ${settings.topic}
        দৈর্ঘ্য: ${settings.length}
        প্রেক্ষাপট: ${settings.plotHint || "একটি চমৎকার গল্পের অবতারণা করুন।"}
        

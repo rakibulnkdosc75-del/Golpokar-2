@@ -1,3 +1,4 @@
+
 export enum StoryType {
   SHORT_STORY = 'ছোটগল্প (Short Story)',
   LONG_STORY = 'বড়গল্প (Boro Golpo)',
@@ -14,6 +15,17 @@ export enum Genre {
   SOCIAL = 'সামাজিক (Social)',
   FANTASY = 'কল্পকাহিনী (Fantasy)',
   COMEDY = 'হাস্যরসাত্মক (Comedy)'
+}
+
+export enum Topic {
+  ADVENTURE = 'অভিযান (Adventure)',
+  SCI_FI = 'কল্পবিজ্ঞান (Sci-Fi)',
+  HISTORICAL = 'ঐতিহাসিক (Historical)',
+  SOCIAL_ISSUES = 'সামাজিক সমস্যা (Social Issues)',
+  DETECTIVE = 'গোয়েন্দা (Detective)',
+  MYTHOLOGY = 'পৌরাণিক (Mythology)',
+  SURVIVAL = 'অস্তিত্ব রক্ষা (Survival)',
+  PHILOSOPHICAL = 'দার্শনিক (Philosophical)'
 }
 
 export enum WritingStyle {
@@ -33,6 +45,7 @@ export interface StorySettings {
   title: string;
   type: StoryType;
   genre: Genre;
+  topic: Topic;
   style: WritingStyle;
   isMature: boolean;
   length: 'very short' | 'short' | 'medium' | 'long' | 'very long';

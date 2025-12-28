@@ -4,7 +4,7 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import StoryDisplay from './components/StoryDisplay';
 import HistoryPanel from './components/HistoryPanel';
-import { StorySettings, StoryType, Genre, StoryState, WritingStyle, StoryHistoryItem } from './types';
+import { StorySettings, StoryType, Genre, Topic, StoryState, WritingStyle, StoryHistoryItem } from './types';
 import { generateStoryStream, StoryGenerationError, ERROR_CODES } from './services/gemini';
 
 const STORAGE_KEY = 'golpakar_draft_v3';
@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS: StorySettings = {
   title: '',
   type: StoryType.SHORT_STORY,
   genre: Genre.SOCIAL,
+  topic: Topic.SOCIAL_ISSUES,
   style: WritingStyle.MODERN,
   isMature: false,
   length: 'medium',
