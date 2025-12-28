@@ -14,8 +14,12 @@ const Sidebar: React.FC<SidebarProps> = ({ settings, setSettings, onGenerate, is
     setSettings(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleToggle = () => {
+  const handleToggleMature = () => {
     setSettings(prev => ({ ...prev, isMature: !prev.isMature }));
+  };
+
+  const handleToggleContinuity = () => {
+    setSettings(prev => ({ ...prev, continuityMode: prev.continuityMode === 'strict' ? 'flexible' : 'strict' }));
   };
 
   const lengthOptions = [
@@ -114,14 +118,33 @@ const Sidebar: React.FC<SidebarProps> = ({ settings, setSettings, onGenerate, is
         </div>
       </div>
 
-      <div className="pt-4 border-t border-slate-100">
-        <div className="flex items-center justify-between mb-4">
+      <div className="pt-4 border-t border-slate-100 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col">
+            <span className="text-sm font-bold text-slate-800">ধারাবাহিকতা (Continuity)</span>
+            <span className="text-[10px] text-slate-500">{settings.continuityMode === 'strict' ? 'কঠোর (Strict)' : 'নমনীয় (Flexible)'}</span>
+          </div>
+          <button
+            onClick={handleToggleContinuity}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+              settings.continuityMode === 'strict' ? 'bg-indigo-600' : 'bg-slate-400'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                settings.continuityMode === 'strict' ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between">
           <div className="flex flex-col">
             <span className="text-sm font-bold text-slate-800">অ্যাডাল্ট সেটিং (18+)</span>
             <span className="text-xs text-slate-500">পরিপক্ব কন্টেন্ট চালু করুন</span>
           </div>
           <button
-            onClick={handleToggle}
+            onClick={handleToggleMature}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
               settings.isMature ? 'bg-indigo-600' : 'bg-slate-300'
             }`}
@@ -133,8 +156,9 @@ const Sidebar: React.FC<SidebarProps> = ({ settings, setSettings, onGenerate, is
             />
           </button>
         </div>
+        
         {settings.isMature && (
-          <div className="p-3 bg-red-50 rounded-lg mb-4">
+          <div className="p-3 bg-red-50 rounded-lg">
             <p className="text-[10px] text-red-600 font-medium leading-relaxed">
               সতর্কতা: ১৮+ সেটিং চালু করা হয়েছে। এতে পরিপক্ব বিষয়ের অবতারণা হতে পারে।
             </p>

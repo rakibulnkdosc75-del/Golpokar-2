@@ -27,6 +27,7 @@ export enum WritingStyle {
 }
 
 export type Theme = 'light' | 'dark' | 'sepia';
+export type ContinuityMode = 'strict' | 'flexible';
 
 export interface StorySettings {
   title: string;
@@ -36,6 +37,7 @@ export interface StorySettings {
   isMature: boolean;
   length: 'very short' | 'short' | 'medium' | 'long' | 'very long';
   plotHint: string;
+  continuityMode: ContinuityMode;
 }
 
 export interface StoryState {

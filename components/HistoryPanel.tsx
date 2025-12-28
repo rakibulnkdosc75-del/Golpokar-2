@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { StoryHistoryItem } from '../types';
 
 interface HistoryPanelProps {
@@ -11,6 +10,22 @@ interface HistoryPanelProps {
 }
 
 const HistoryPanel: React.FC<HistoryPanelProps> = ({ isOpen, onClose, history, onLoad, onDelete }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredHistory = useMemo(() => {
+    if (!searchTerm.trim()) return history.sort((a, b) => b.timestamp - a.timestamp);
+
+    const term = searchTerm.toLowerCase().trim();
+    return history
+      .filter((item) => {
+        const titleMatch = (item.settings.title || "").toLowerCase().includes(term);
+        const genreMatch = item.settings.genre.toLowerCase().includes(term);
+        const contentMatch = item.content.toLowerCase().includes(term);
+        return titleMatch || genreMatch || contentMatch;
+      })
+      .sort((a, b) => b.timestamp - a.timestamp);
+  }, [history, searchTerm]);
+
   if (!isOpen) return null;
 
   return (
@@ -34,6 +49,34 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ isOpen, onClose, history, o
             </button>
           </div>
 
+          {/* Search Bar */}
+          <div className="px-4 py-3 border-b border-slate-100 bg-white sticky top-0 z-10">
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none bengali-font"
+                placeholder="গল্পের নাম, জনরা বা কী-ওয়ার্ড দিয়ে খুঁজুন..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <button 
+                  onClick={() => setSearchTerm('')}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {history.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 opacity-40">
@@ -42,8 +85,15 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ isOpen, onClose, history, o
                 </svg>
                 <p className="font-medium">এখনও কোনো গল্প সেভ করা হয়নি</p>
               </div>
+            ) : filteredHistory.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 opacity-40">
+                <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.172 9.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="font-medium">"{searchTerm}" এর সাথে মিল রয়েছে এমন কিছু পাওয়া যায়নি</p>
+              </div>
             ) : (
-              history.sort((a, b) => b.timestamp - a.timestamp).map((item) => (
+              filteredHistory.map((item) => (
                 <div 
                   key={item.id} 
                   className="group bg-white border border-slate-200 rounded-xl p-4 hover:border-indigo-400 hover:shadow-md transition-all relative overflow-hidden"
@@ -65,9 +115,8 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ isOpen, onClose, history, o
 
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex space-x-2 text-slate-500 font-bold uppercase tracking-tighter">
-                      <span>{item.settings.type.split(' ')[0]}</span>
-                      <span>•</span>
-                      <span>{item.settings.genre.split(' ')[0]}</span>
+                      <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[9px]">{item.settings.type.split(' ')[0]}</span>
+                      <span className="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded text-[9px]">{item.settings.genre.split(' ')[0]}</span>
                     </div>
                     
                     <div className="flex space-x-2">

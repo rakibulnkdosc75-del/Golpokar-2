@@ -1,8 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { StorySettings, WritingStyle } from "../types";
 
-const API_KEY = process.env.API_KEY || "";
-
 export const ERROR_CODES = {
   MISSING_API_KEY: 'ERR_AUTH_01',
   SAFETY_BLOCKED: 'ERR_SAFE_02',
@@ -42,33 +40,60 @@ const getStyleInstruction = (style: WritingStyle) => {
   }
 };
 
+/**
+ * Truncates content to fit within context window while keeping the most relevant part (the end).
+ */
+const getRelevantContext = (content: string, maxChars = 12000) => {
+  if (content.length <= maxChars) return content;
+  return "[...পুরানো অংশ...] " + content.slice(-maxChars);
+};
+
 export const generateStoryStream = async (
   settings: StorySettings,
   onChunk: (chunk: string) => void,
   signal?: AbortSignal,
   existingContent?: string
 ) => {
-  if (!API_KEY) {
+  // Always use process.env.API_KEY directly as per requirements
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
     throw new StoryGenerationError("API Key missing.", ERROR_CODES.MISSING_API_KEY);
   }
 
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
-  const systemInstruction = `You are a world-class Bengali author (Sahityik). 
-  Write high-quality, emotionally resonant Bengali literature.
-  Style: ${getStyleInstruction(settings.style)}
-  ${settings.isMature ? "Target: Adults (18+). Mature themes allowed. Maintain artistic integrity." : "Target: General audience. Family-friendly."}
-  Respond ONLY with Bengali story text. No English.`;
+  const continuityInstruction = settings.continuityMode === 'strict' 
+    ? "Maintain strict continuity. Do NOT contradict established plot points, character names, or settings from previous sections. Logic and consistency are paramount."
+    : "Feel free to take creative liberties. You can introduce unexpected twists or evolve the story in surprising ways even if it deviates from a linear path.";
 
+  const matureInstruction = settings.isMature 
+    ? "Target: Adults (18+). You are permitted to explore mature, complex, and dark themes where appropriate for the narrative. Maintain literary and artistic integrity. Focus on deep psychological realism and intense human emotions." 
+    : "Target: General audience. Ensure the content remains family-friendly, avoiding any explicit or highly sensitive themes.";
+
+  const systemInstruction = `You are an acclaimed Bengali novelist and storyteller (Sahityik). 
+  Write high-quality, emotionally resonant literature in Bengali.
+  Style: ${getStyleInstruction(settings.style)}
+  Continuity Mode: ${continuityInstruction}
+  Safety & Audience: ${matureInstruction}
+  Respond ONLY with Bengali story text. No English. No conversational filler. No meta-commentary.`;
+
+  const context = existingContent ? getRelevantContext(existingContent) : "";
+  
   const prompt = existingContent 
-    ? `Based on the following existing story content, continue the story seamlessly. Keep the characters and tone consistent.
-       ${settings.plotHint ? `Current Plot Context/Direction: ${settings.plotHint}` : ''}
-       --- EXISTING CONTENT ---
-       ${existingContent}
-       --- CONTINUE WRITING NOW ---`
-    : `Write a ${settings.type} titled "${settings.title || "গল্প"}" in the ${settings.genre} genre. 
-       ${settings.plotHint ? `Specific Plot/Context to include: ${settings.plotHint}` : ''}
-       Length requirement: ${settings.length}. Start the story now in Bengali:`;
+    ? `You are writing a ${settings.type} titled "${settings.title || "গল্প"}". 
+       Below is the previous part of the story. Please CONTINUE the story seamlessly from where it left off. 
+       Do NOT repeat the existing text. Write the next logical segment.
+       ${settings.plotHint ? `Next direction/event: ${settings.plotHint}` : ''}
+       
+       --- PREVIOUS PART ---
+       ${context}
+       --- END OF PREVIOUS PART ---
+       
+       CONTINUE NOW:`
+    : `Write a ${settings.type} titled "${settings.title || "নতুন গল্প"}" in the ${settings.genre} genre. 
+       ${settings.plotHint ? `Specific Context/Plot: ${settings.plotHint}` : ''}
+       Desired Story length: ${settings.length}. 
+       Begin the story now:`;
 
   try {
     const result = await ai.models.generateContentStream({
@@ -76,7 +101,8 @@ export const generateStoryStream = async (
       contents: prompt,
       config: {
         systemInstruction,
-        temperature: 0.8,
+        temperature: settings.continuityMode === 'strict' ? 0.6 : 0.85,
+        topP: 0.95,
       },
     });
 
@@ -87,12 +113,23 @@ export const generateStoryStream = async (
     }
   } catch (error: any) {
     if (signal?.aborted) return;
-    console.error("Gemini Error:", error);
+    console.error("Gemini Generation Error:", error);
+    
     let message = "গল্প তৈরি করতে সমস্যা হয়েছে।";
     let code = ERROR_CODES.UNKNOWN;
-    const errStr = error?.message?.toLowerCase() || "";
-    if (errStr.includes("safety")) { message = "নিরাপত্তা ফিল্টারের কারণে তৈরি করা সম্ভব হয়নি।"; code = ERROR_CODES.SAFETY_BLOCKED; }
-    else if (errStr.includes("quota") || errStr.includes("429")) { message = "অনেক বেশি রিকোয়েস্ট পাঠানো হয়েছে।"; code = ERROR_CODES.QUOTA_EXCEEDED; }
+    const errStr = (error?.message || "").toLowerCase();
+    
+    if (errStr.includes("safety")) { 
+      message = "নিরাপত্তা ফিল্টারের কারণে কন্টেন্ট জেনারেট করা সম্ভব হয়নি। সম্ভবত কন্টেন্ট খুব বেশি স্পর্শকাতর হয়ে গিয়েছে।"; 
+      code = ERROR_CODES.SAFETY_BLOCKED; 
+    } else if (errStr.includes("quota") || errStr.includes("429")) { 
+      message = "কোটা শেষ হয়ে গিয়েছে বা অনেক রিকোয়েস্ট পাঠানো হয়েছে। কিছুক্ষণ অপেক্ষা করে আবার চেষ্টা করুন।"; 
+      code = ERROR_CODES.QUOTA_EXCEEDED; 
+    } else if (errStr.includes("network") || errStr.includes("fetch")) {
+      message = "নেটওয়ার্ক কানেকশনে সমস্যা হচ্ছে। দয়া করে আপনার ইন্টারনেট চেক করুন।";
+      code = ERROR_CODES.NETWORK_ISSUE;
+    }
+    
     throw new StoryGenerationError(message, code);
   }
 };
