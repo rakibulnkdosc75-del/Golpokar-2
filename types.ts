@@ -1,4 +1,3 @@
-
 export enum StoryType {
   SHORT_STORY = 'ছোটগল্প (Short Story)',
   LONG_STORY = 'বড়গল্প (Boro Golpo)',
@@ -36,6 +35,7 @@ export interface StorySettings {
   style: WritingStyle;
   isMature: boolean;
   length: 'very short' | 'short' | 'medium' | 'long' | 'very long';
+  plotHint: string;
 }
 
 export interface StoryState {

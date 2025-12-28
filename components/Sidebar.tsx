@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { StorySettings, StoryType, Genre, WritingStyle } from '../types';
 
@@ -10,7 +9,7 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ settings, setSettings, onGenerate, isGenerating }) => {
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setSettings(prev => ({ ...prev, [name]: value }));
   };
@@ -39,6 +38,19 @@ const Sidebar: React.FC<SidebarProps> = ({ settings, setSettings, onGenerate, is
           placeholder="যেমন: শেষ বিকেলের মেঘ"
           className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none"
         />
+      </div>
+
+      <div>
+        <label className="block text-sm font-semibold text-slate-700 mb-2">গল্পের সূত্র / প্রেক্ষাপট (Plot Hint)</label>
+        <textarea
+          name="plotHint"
+          value={settings.plotHint}
+          onChange={handleInputChange}
+          placeholder="গল্পের প্রধান ঘটনা বা ধারণা সংক্ষেপে লিখুন (ঐচ্ছিক)..."
+          rows={3}
+          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none resize-none text-sm"
+        />
+        <p className="text-[10px] text-slate-400 mt-1">AI-কে গল্পের দিকনির্দেশনা দিতে এটি ব্যবহার করুন।</p>
       </div>
 
       <div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -18,6 +17,7 @@ const App: React.FC = () => {
     style: WritingStyle.MODERN,
     isMature: false,
     length: 'medium',
+    plotHint: '',
   });
 
   const [storyState, setStoryState] = useState<StoryState>({
@@ -125,9 +125,6 @@ const App: React.FC = () => {
       // Auto-save to history after generation completes
       if (!isContinuation) {
         addToHistory(fullContent, settings);
-      } else {
-        // For continuation, we might want to update the history item or just leave it for user to save
-        // For now, let's keep the simplicity of auto-saving on first full gen
       }
       
     } catch (err: any) {

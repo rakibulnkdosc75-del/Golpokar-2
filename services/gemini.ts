@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { StorySettings, WritingStyle } from "../types";
 
@@ -63,11 +62,13 @@ export const generateStoryStream = async (
 
   const prompt = existingContent 
     ? `Based on the following existing story content, continue the story seamlessly. Keep the characters and tone consistent.
+       ${settings.plotHint ? `Current Plot Context/Direction: ${settings.plotHint}` : ''}
        --- EXISTING CONTENT ---
        ${existingContent}
        --- CONTINUE WRITING NOW ---`
     : `Write a ${settings.type} titled "${settings.title || "গল্প"}" in the ${settings.genre} genre. 
-       Length requirement: ${settings.length}. Start the story now:`;
+       ${settings.plotHint ? `Specific Plot/Context to include: ${settings.plotHint}` : ''}
+       Length requirement: ${settings.length}. Start the story now in Bengali:`;
 
   try {
     const result = await ai.models.generateContentStream({
