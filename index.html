@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="bn">
 <head>
@@ -8,29 +7,82 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&family=Noto+Sans+Bengali:wght@100..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Anek+Bangla:wght@100..800&family=Hind+Siliguri:wght@300;400;500;600;700&family=Mina:wght@400;700&family=Noto+Sans+Bengali:wght@100..900&family=Tiro+Bangla:ital@0;1&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --font-noto: 'Noto Sans Bengali', sans-serif;
+            --font-anek: 'Anek Bangla', sans-serif;
+            --font-tiro: 'Tiro Bangla', serif;
+            --font-hind: 'Hind Siliguri', sans-serif;
+            --font-mina: 'Mina', sans-serif;
+        }
+        
         body {
-            font-family: 'Noto Sans Bengali', 'Hind Siliguri', sans-serif;
-            background-color: #f8fafc;
+            font-family: var(--font-noto);
+            background-color: #f1f5f9;
+            overflow: hidden;
+            color: #1e293b;
         }
-        .bengali-font {
-            font-family: 'Noto Sans Bengali', sans-serif;
-        }
-        /* Custom scrollbar for better aesthetics */
+
+        .bengali-font { font-family: var(--font-noto); }
+        .font-anek { font-family: var(--font-anek); }
+        .font-tiro { font-family: var(--font-tiro); }
+        .font-hind { font-family: var(--font-hind); }
+        .font-mina { font-family: var(--font-mina); }
+
+        /* Premium Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
         }
         ::-webkit-scrollbar-track {
-            background: #f1f1f1;
+            background: rgba(0,0,0,0.02);
         }
         ::-webkit-scrollbar-thumb {
             background: #cbd5e1;
-            border-radius: 10px;
+            border-radius: 20px;
+            border: 2px solid transparent;
+            background-clip: content-box;
         }
         ::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
+            background-clip: content-box;
         }
+
+        /* Paper Texture Overlay */
+        .paper-texture::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            opacity: 0.03;
+            pointer-events: none;
+            background-image: url("https://www.transparenttextures.com/patterns/natural-paper.png");
+            z-index: 1;
+        }
+
+        /* Glassmorphism Classes */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .glass-dark {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Custom Animations */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+            100% { transform: translateY(0px); }
+        }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        
+        * { transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s ease; }
     </style>
 <script type="importmap">
 {
@@ -48,12 +100,5 @@
 </head>
 <body>
     <div id="root"></div>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration failed:', err));
-        });
-      }
-    </script>
 </body>
 </html>

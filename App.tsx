@@ -24,6 +24,7 @@ const DEFAULT_SETTINGS: StorySettings = {
 
 const App: React.FC = () => {
   const [settings, setSettings] = useState<StorySettings>(DEFAULT_SETTINGS);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   const [storyState, setStoryState] = useState<StoryState>({
     content: '',
@@ -38,6 +39,18 @@ const App: React.FC = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const initialLoadRef = useRef(false);
   const saveTimeoutRef = useRef<number | null>(null);
+
+  // Monitor network status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Load state on mount
   useEffect(() => {
@@ -57,6 +70,13 @@ const App: React.FC = () => {
       } catch (e) { console.error("History load failed", e); }
     }
     initialLoadRef.current = true;
+    
+    // Register Service Worker with a relative path to avoid origin mismatch
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js', { scope: './' })
+        .then(reg => console.debug('SW registered', reg))
+        .catch(err => console.debug('SW registration failed', err));
+    }
   }, []);
 
   // Auto-save debounced
@@ -122,6 +142,7 @@ const App: React.FC = () => {
   }, []);
 
   const getErrorAdvice = (code?: string) => {
+    if (!isOnline) return "আপনি বর্তমানে অফলাইনে আছেন। গল্প তৈরির জন্য ইন্টারনেট সংযোগ প্রয়োজন। আপনার অফলাইন ড্রাফট সংরক্ষিত আছে।";
     switch (code) {
       case ERROR_CODES.SAFETY_BLOCKED:
         return "গোপনীয়তা বা নিরাপত্তা ফিল্টার আপনার অনুরোধটি গ্রহণ করতে পারছে না। কাহিনীর প্রেক্ষাপট বা সংলাপে থাকা সংবেদনশীল শব্দগুলো পরিবর্তন করে দেখুন। ১৮+ মুড অন থাকলে সাধারণত বাধা কম থাকে।";
@@ -136,6 +157,10 @@ const App: React.FC = () => {
 
   const handleGenerate = useCallback(async (isContinuation: boolean = false) => {
     if (storyState.isGenerating) return;
+    if (!isOnline) {
+       setStoryState(prev => ({ ...prev, error: "ইন্টারনেট সংযোগ নেই", errorCode: ERROR_CODES.NETWORK_ISSUE }));
+       return;
+    }
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -181,11 +206,16 @@ const App: React.FC = () => {
         errorCode: err instanceof StoryGenerationError ? err.code : ERROR_CODES.UNKNOWN
       }));
     }
-  }, [settings, storyState.isGenerating, storyState.content, addToHistory, updateLatestHistory]);
+  }, [settings, storyState.isGenerating, storyState.content, addToHistory, updateLatestHistory, isOnline]);
 
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-bengali">
-      <Header onOpenHistory={() => setIsHistoryOpen(true)} historyCount={history.length} saveStatus={saveStatus} />
+      <Header 
+        onOpenHistory={() => setIsHistoryOpen(true)} 
+        historyCount={history.length} 
+        saveStatus={saveStatus} 
+        isOnline={isOnline}
+      />
       
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
         {storyState.error && (
@@ -212,13 +242,15 @@ const App: React.FC = () => {
 
             <div className="flex justify-between items-center">
                <span className="text-[10px] text-slate-400 font-mono font-black uppercase tracking-widest">ID: {storyState.errorCode}</span>
-               <button 
-                 onClick={() => handleGenerate(storyState.content.length > 0)} 
-                 className="text-sm font-black text-indigo-600 hover:text-white uppercase tracking-widest flex items-center space-x-3 bg-indigo-50 hover:bg-indigo-600 px-6 py-3 rounded-2xl active:scale-95 transition-all shadow-sm border border-indigo-100"
-               >
-                 <span>পুনরায় চেষ্টা</span>
-                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-               </button>
+               {isOnline && (
+                 <button 
+                   onClick={() => handleGenerate(storyState.content.length > 0)} 
+                   className="text-sm font-black text-indigo-600 hover:text-white uppercase tracking-widest flex items-center space-x-3 bg-indigo-50 hover:bg-indigo-600 px-6 py-3 rounded-2xl active:scale-95 transition-all shadow-sm border border-indigo-100"
+                 >
+                   <span>পুনরায় চেষ্টা</span>
+                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                 </button>
+               )}
             </div>
           </div>
         )}
@@ -230,6 +262,7 @@ const App: React.FC = () => {
           onStop={handleStop}
           onReset={handleReset}
           isGenerating={storyState.isGenerating}
+          isOnline={isOnline}
         />
 
         <StoryDisplay 
@@ -237,6 +270,7 @@ const App: React.FC = () => {
           isGenerating={storyState.isGenerating}
           settings={settings}
           onContinue={() => handleGenerate(true)}
+          isOnline={isOnline}
         />
       </main>
 
