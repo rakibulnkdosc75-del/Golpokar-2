@@ -7,8 +7,8 @@ import HistoryPanel from './components/HistoryPanel';
 import { StorySettings, StoryType, Genre, Topic, StoryState, WritingStyle, StoryHistoryItem, Theme } from './types';
 import { generateStoryStream, StoryGenerationError, ERROR_CODES } from './services/gemini';
 
-const STORAGE_KEY = 'golpakar_draft_v7_final';
-const HISTORY_KEY = 'golpakar_history_v6_final';
+const STORAGE_KEY = 'golpakar_draft_v8_final';
+const HISTORY_KEY = 'golpakar_history_v7_final';
 const THEME_KEY = 'golpakar_theme_v3';
 
 const DEFAULT_SETTINGS: StorySettings = {
@@ -42,6 +42,7 @@ const App: React.FC = () => {
   const initialLoadRef = useRef(false);
   const saveTimeoutRef = useRef<number | null>(null);
 
+  // Network listener
   useEffect(() => {
     const handleStatusChange = () => {
       const online = navigator.onLine;
@@ -49,7 +50,7 @@ const App: React.FC = () => {
       if (!online) {
         setStoryState(prev => ({ 
           ...prev, 
-          error: "ইন্টারনেট নেই। আপনি অফলাইনে ড্রাফট লিখতে পারবেন যা ব্রাউজারে সেভ হবে।", 
+          error: "ইন্টারনেট বিচ্ছিন্ন। অফলাইনে ড্রাফট লিখতে পারবেন, যা লোকাল স্টোরেজে সেভ হবে।", 
           errorCode: ERROR_CODES.NETWORK_ISSUE 
         }));
       } else {
@@ -65,11 +66,13 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // Theme effect
   useEffect(() => {
     localStorage.setItem(THEME_KEY, theme);
     document.documentElement.className = theme === 'dark' ? 'dark-mode' : theme === 'sepia' ? 'sepia-mode' : '';
   }, [theme]);
 
+  // Initial load and Service Worker registration
   useEffect(() => {
     const savedDraft = localStorage.getItem(STORAGE_KEY);
     if (savedDraft) {
@@ -77,33 +80,34 @@ const App: React.FC = () => {
         const parsed = JSON.parse(savedDraft);
         if (parsed.settings) setSettings(parsed.settings);
         if (parsed.content) setStoryState(prev => ({ ...prev, content: parsed.content }));
-      } catch (e) { console.error("Draft load failed", e); }
+      } catch (e) { console.debug("Draft load skipped"); }
     }
 
     const savedHistory = localStorage.getItem(HISTORY_KEY);
     if (savedHistory) {
       try {
         setHistory(JSON.parse(savedHistory));
-      } catch (e) { console.error("History load failed", e); }
+      } catch (e) { console.debug("History load skipped"); }
     }
     initialLoadRef.current = true;
     
-    // SAFE SERVICE WORKER REGISTRATION (Avoids Invalid URL/Origin errors in sandboxed iframes)
-    if ('serviceWorker' in navigator) {
+    // ERROR-FREE SERVICE WORKER REGISTRATION
+    // We strictly avoid registration in cross-origin frames to prevent origin mismatch errors.
+    if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
       try {
-        // Use simple relative path to avoid "Invalid URL" constructor issues
-        navigator.serviceWorker.register('sw.js')
-          .then(reg => console.debug('Offline Engine Ready:', reg.scope))
-          .catch(err => {
-            // Log as debug to prevent origin mismatch noise in dev consoles
-            console.debug('Service Worker restricted or blocked in this environment (likely due to sandbox):', err);
-          });
-      } catch (e) {
-        console.debug('Service Worker not supported or restricted.');
+        const isFramed = window.self !== window.top;
+        if (!isFramed) {
+          navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.debug('Offline engine active'))
+            .catch(err => console.debug('SW skipped in this context'));
+        }
+      } catch (swError) {
+        console.debug('SW environment restriction');
       }
     }
   }, []);
 
+  // Debounced auto-save
   useEffect(() => {
     if (!initialLoadRef.current) return;
     
@@ -118,11 +122,12 @@ const App: React.FC = () => {
       } catch (e) {
         setSaveStatus('idle');
       }
-    }, 800);
+    }, 1000);
 
     return () => { if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current); };
   }, [settings, storyState.content]);
 
+  // History sync
   useEffect(() => {
     if (!initialLoadRef.current) return;
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
@@ -153,7 +158,7 @@ const App: React.FC = () => {
   };
 
   const loadFromHistory = (item: StoryHistoryItem) => {
-    if (storyState.content.trim() && !window.confirm("বর্তমান লেখাটি মুছে আর্কাইভ থেকে লোড করবেন?")) return;
+    if (storyState.content.trim() && !window.confirm("বর্তমান লেখাটি আর্কাইভ থেকে লোড করলে বর্তমান ড্রাফটটি মুছে যাবে। নিশ্চিত?")) return;
     setSettings(item.settings);
     setStoryState({ content: item.content, isGenerating: false, error: null });
     setIsHistoryOpen(false);
@@ -169,7 +174,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleReset = useCallback(() => {
-    if (window.confirm("সব লেখা মুছে নতুন গল্প শুরু করবেন? এটি ফিরে পাওয়া যাবে না।")) {
+    if (window.confirm("সব লেখা মুছে নতুন গল্প শুরু করতে চান? এটি ফিরে পাওয়া যাবে না।")) {
       setSettings(DEFAULT_SETTINGS);
       setStoryState({ content: '', isGenerating: false, error: null });
     }
@@ -181,7 +186,7 @@ const App: React.FC = () => {
     if (!isOnline) {
       setStoryState(prev => ({ 
         ...prev, 
-        error: "আপনি অফলাইনে আছেন। গল্প তৈরি করতে ইন্টারনেট প্রয়োজন।", 
+        error: "আপনি অফলাইনে আছেন। গল্প তৈরি করতে ইন্টারনেট সংযোগ প্রয়োজন।", 
         errorCode: ERROR_CODES.NETWORK_ISSUE 
       }));
       return;
@@ -216,7 +221,7 @@ const App: React.FC = () => {
       setStoryState(prev => ({
         ...prev,
         isGenerating: false,
-        error: err.message || "ত্রুটি হয়েছে। পুনরায় চেষ্টা করুন।",
+        error: err.message || "গল্প তৈরিতে সমস্যা হয়েছে। পুনরায় চেষ্টা করুন।",
         errorCode: err.code || ERROR_CODES.UNKNOWN
       }));
     }
@@ -260,7 +265,7 @@ const App: React.FC = () => {
         {storyState.error && (
           <div className={`fixed bottom-24 right-4 z-[100] max-w-sm p-6 rounded-3xl shadow-2xl border-l-4 border-rose-500 animate-in slide-in-from-right-full duration-500 ${theme === 'dark' ? 'bg-slate-900 text-slate-100' : 'bg-white text-slate-800'}`}>
             <div className="flex justify-between items-start mb-2">
-              <h3 className="font-black text-rose-500 uppercase text-[10px] tracking-widest">বিজ্ঞপ্তি</h3>
+              <h3 className="font-black text-rose-500 uppercase text-[10px] tracking-widest">বিজ্ঞপ্তি (Notice)</h3>
               <button onClick={() => setStoryState(p => ({...p, error: null}))} className="text-slate-400 hover:text-slate-600 p-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
