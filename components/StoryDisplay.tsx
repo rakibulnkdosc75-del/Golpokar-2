@@ -1,99 +1,120 @@
 
-import React from 'react';
-import { StorySettings } from '../types';
+import React, { useRef, useState } from 'react';
+import { StorySettings, Theme } from '../types';
+// @ts-ignore
+import html2pdf from 'html2pdf.js';
+// @ts-ignore
+import * as docx from 'docx';
+// @ts-ignore
+import * as FileSaver from 'file-saver';
+
+const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
+const saveAs = (FileSaver as any).saveAs || (FileSaver as any).default?.saveAs || (window as any).saveAs;
 
 interface StoryDisplayProps {
   content: string;
   isGenerating: boolean;
   settings: StorySettings;
+  onContinue: () => void;
 }
 
-const StoryDisplay: React.FC<StoryDisplayProps> = ({ content, isGenerating, settings }) => {
+const StoryDisplay: React.FC<StoryDisplayProps> = ({ content, isGenerating, settings, onContinue }) => {
+  const [theme, setTheme] = useState<Theme>('light');
   const isPlaceholder = !content && !isGenerating;
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const wordCount = content ? content.trim().split(/\s+/).length : 0;
+
+  const handleExportPDF = () => {
+    if (!printRef.current) return;
+    const opt = {
+      margin: 0.5,
+      filename: `${settings.title || 'story'}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    html2pdf().from(printRef.current).set(opt).save();
+  };
+
+  const handleExportDocx = async () => {
+    try {
+      const doc = new Document({
+        sections: [{
+          children: [
+            new Paragraph({ text: settings.title || "গল্প", heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER }),
+            ...content.split('\n').map(line => new Paragraph({
+              children: [new TextRun({ text: line, size: 28 })],
+              spacing: { line: 360, after: 200 },
+            }))
+          ]
+        }]
+      });
+      const blob = await Packer.toBlob(doc);
+      saveAs(blob, `${settings.title || 'story'}.docx`);
+    } catch (e) { alert("DOCX export failed."); }
+  };
+
+  const themeClasses = {
+    light: 'bg-white text-slate-900',
+    dark: 'bg-slate-900 text-slate-100',
+    sepia: 'bg-[#f4ecd8] text-[#5b4636]'
+  };
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50 min-h-full">
-      <div className="max-w-3xl mx-auto bg-white shadow-xl rounded-2xl min-h-[80vh] flex flex-col overflow-hidden border border-slate-100">
-        {/* Story Header Decor */}
-        <div className="h-2 bg-indigo-600 w-full"></div>
+    <div className={`flex-1 overflow-y-auto p-4 md:p-8 transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-950' : 'bg-slate-50'}`}>
+      <div className={`max-w-3xl mx-auto shadow-2xl rounded-2xl min-h-[85vh] flex flex-col overflow-hidden border ${theme === 'dark' ? 'border-slate-800' : 'border-slate-100'} ${themeClasses[theme]}`}>
         
-        <div className="p-8 md:p-12 flex-1">
+        {/* Toolbar */}
+        <div className={`px-6 py-3 border-b flex items-center justify-between ${theme === 'dark' ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50/50'}`}>
+          <div className="flex space-x-2">
+            {(['light', 'dark', 'sepia'] as Theme[]).map(t => (
+              <button 
+                key={t}
+                onClick={() => setTheme(t)}
+                className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${theme === t ? 'border-indigo-500 scale-110' : 'border-transparent'} ${t === 'light' ? 'bg-white' : t === 'dark' ? 'bg-slate-800' : 'bg-[#f4ecd8]'}`}
+              />
+            ))}
+          </div>
+          <div className="text-[10px] font-bold opacity-60 uppercase tracking-widest">
+            {wordCount} শব্দ (Words)
+          </div>
+        </div>
+
+        <div ref={printRef} className="p-8 md:p-14 flex-1">
           {isPlaceholder ? (
-            <div className="h-full flex flex-col items-center justify-center text-center space-y-6 py-20">
-              <div className="p-4 bg-indigo-50 rounded-full">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-slate-800 mb-2">আপনার নতুন গল্প শুরু করুন</h2>
-                <p className="text-slate-500 max-w-sm">বামে সেটিং থেকে শিরোনাম এবং জনরা সিলেক্ট করে 'তৈরি করুন' বাটনে ক্লিক করুন।</p>
-              </div>
+            <div className="h-full flex flex-col items-center justify-center text-center space-y-4 py-32 opacity-40">
+              <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+              <p className="text-xl font-medium">নতুন গল্প তৈরি করুন</p>
             </div>
           ) : (
-            <div className="space-y-8 animate-in fade-in duration-700">
-              <div className="border-b border-slate-100 pb-8 text-center">
-                <h1 className="text-3xl md:text-4xl font-black text-slate-900 leading-tight mb-4">
-                  {settings.title || "গল্পের শিরোনাম"}
-                </h1>
-                <div className="flex items-center justify-center space-x-4 text-sm text-slate-500 font-medium">
-                  <span className="flex items-center">
-                    <svg className="h-4 w-4 mr-1 text-indigo-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-                      <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
-                    </svg>
-                    {settings.type}
-                  </span>
-                  <span className="h-1 w-1 rounded-full bg-slate-300"></span>
-                  <span className="flex items-center">
-                    <svg className="h-4 w-4 mr-1 text-indigo-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M11.3 1.047a1 1 0 01.897.95l1.481 22.338a1 1 0 01-1.99.132l-1.481-22.338a1 1 0 011.093-1.082zM17.657 5.741a1 1 0 01.022 1.412l-14 14a1 1 0 01-1.414-1.414l14-14a1 1 0 011.392-.022z" clipRule="evenodd" />
-                    </svg>
-                    {settings.genre}
-                  </span>
-                </div>
-              </div>
-
-              <div className="story-content text-slate-800 text-lg md:text-xl leading-[1.8] whitespace-pre-wrap bengali-font select-text">
+            <article className="space-y-8 animate-in fade-in duration-500">
+              <header className="border-b pb-8 text-center border-current opacity-80">
+                <h1 className="text-3xl md:text-5xl font-black mb-4">{settings.title || "গল্পের শিরোনাম"}</h1>
+                <div className="text-sm font-bold opacity-70 uppercase tracking-widest">{settings.type} • {settings.genre} • {settings.style}</div>
+              </header>
+              <div className="story-content text-xl md:text-2xl leading-[2.2] whitespace-pre-wrap bengali-font select-text text-justify px-2">
                 {content}
-                {isGenerating && (
-                  <span className="inline-block w-2 h-6 bg-indigo-500 animate-pulse ml-1 align-middle"></span>
-                )}
+                {isGenerating && <span className="inline-block w-2 h-7 bg-indigo-500 animate-pulse ml-1 align-middle"></span>}
               </div>
-            </div>
+            </article>
           )}
         </div>
 
         {content && !isGenerating && (
-          <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end items-center space-x-4">
-             <button 
-              onClick={() => {
+          <div className={`p-6 border-t flex flex-wrap gap-3 justify-center md:justify-end items-center ${theme === 'dark' ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50/50'}`}>
+            <button onClick={onContinue} className="bg-indigo-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-indigo-700 transition-all active:scale-95 flex items-center space-x-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <span>পরবর্তী অংশ লিখুন</span>
+            </button>
+            <div className="flex bg-white/10 p-1 rounded-lg backdrop-blur">
+              <button onClick={handleExportPDF} className="px-3 py-2 hover:bg-white/10 rounded">PDF</button>
+              <button onClick={handleExportDocx} className="px-3 py-2 hover:bg-white/10 rounded">DOCX</button>
+              <button onClick={() => {
                 const blob = new Blob([content], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${settings.title || 'story'}.txt`;
-                a.click();
-              }}
-              className="flex items-center space-x-2 text-indigo-600 font-bold hover:text-indigo-700 text-sm py-2 px-4 rounded-lg bg-white border border-indigo-100 shadow-sm"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              <span>ডাউনলোড করুন</span>
-            </button>
-            <button 
-              onClick={() => {
-                navigator.clipboard.writeText(content);
-                alert('গল্পটি কপি করা হয়েছে!');
-              }}
-              className="flex items-center space-x-2 text-slate-600 font-bold hover:text-slate-800 text-sm py-2 px-4 rounded-lg bg-white border border-slate-200 shadow-sm"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-              </svg>
-              <span>কপি করুন</span>
-            </button>
+                saveAs(blob, `${settings.title || 'story'}.txt`);
+              }} className="px-3 py-2 hover:bg-white/10 rounded">TXT</button>
+            </div>
           </div>
         )}
       </div>

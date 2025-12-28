@@ -1,16 +1,21 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import StoryDisplay from './components/StoryDisplay';
-import { StorySettings, StoryType, Genre, StoryState } from './types';
-import { generateStoryStream } from './services/gemini';
+import HistoryPanel from './components/HistoryPanel';
+import { StorySettings, StoryType, Genre, StoryState, WritingStyle, StoryHistoryItem } from './types';
+import { generateStoryStream, StoryGenerationError } from './services/gemini';
+
+const STORAGE_KEY = 'golpakar_draft_v2';
+const HISTORY_KEY = 'golpakar_history_v1';
 
 const App: React.FC = () => {
   const [settings, setSettings] = useState<StorySettings>({
     title: '',
     type: StoryType.SHORT_STORY,
     genre: Genre.SOCIAL,
+    style: WritingStyle.MODERN,
     isMature: false,
     length: 'medium',
   });
@@ -21,83 +26,159 @@ const App: React.FC = () => {
     error: null,
   });
 
-  const handleGenerate = useCallback(async () => {
-    if (storyState.isGenerating) return;
+  const [history, setHistory] = useState<StoryHistoryItem[]>([]);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
-    setStoryState({
-      content: '',
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const initialLoadRef = useRef(false);
+
+  // Load saved draft and history on mount
+  useEffect(() => {
+    const savedDraft = localStorage.getItem(STORAGE_KEY);
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed.settings) setSettings(parsed.settings);
+        if (parsed.content) setStoryState(prev => ({ ...prev, content: parsed.content }));
+      } catch (e) { console.error("Draft load failed", e); }
+    }
+
+    const savedHistory = localStorage.getItem(HISTORY_KEY);
+    if (savedHistory) {
+      try {
+        setHistory(JSON.parse(savedHistory));
+      } catch (e) { console.error("History load failed", e); }
+    }
+    
+    initialLoadRef.current = true;
+  }, []);
+
+  // Save draft whenever settings or content change
+  useEffect(() => {
+    if (!initialLoadRef.current) return;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, content: storyState.content }));
+  }, [settings, storyState.content]);
+
+  // Save history whenever it changes
+  useEffect(() => {
+    if (!initialLoadRef.current) return;
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  }, [history]);
+
+  const addToHistory = (content: string, settings: StorySettings) => {
+    if (!content.trim()) return;
+    
+    const newItem: StoryHistoryItem = {
+      id: Date.now().toString(),
+      timestamp: Date.now(),
+      content: content.trim(),
+      settings: { ...settings }
+    };
+    
+    setHistory(prev => [newItem, ...prev.slice(0, 49)]); // Keep last 50
+  };
+
+  const loadFromHistory = (item: StoryHistoryItem) => {
+    setSettings(item.settings);
+    setStoryState(prev => ({
+      ...prev,
+      content: item.content,
+      error: null
+    }));
+    setIsHistoryOpen(false);
+  };
+
+  const deleteFromHistory = (id: string) => {
+    setHistory(prev => prev.filter(item => item.id !== id));
+  };
+
+  const handleGenerate = useCallback(async (isContinuation: boolean = false) => {
+    if (storyState.isGenerating) {
+      abortControllerRef.current?.abort();
+      setStoryState(prev => ({ ...prev, isGenerating: false }));
+      return;
+    }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    setStoryState(prev => ({
+      ...prev,
+      content: isContinuation ? prev.content : '',
       isGenerating: true,
       error: null,
-    });
+      errorCode: undefined
+    }));
 
     try {
-      await generateStoryStream(settings, (chunk) => {
-        setStoryState(prev => ({
-          ...prev,
-          content: prev.content + chunk,
-        }));
-      });
+      let fullContent = isContinuation ? storyState.content : '';
+      await generateStoryStream(
+        settings, 
+        (chunk) => {
+          fullContent += chunk;
+          setStoryState(prev => ({ ...prev, content: fullContent }));
+        },
+        controller.signal,
+        isContinuation ? storyState.content : undefined
+      );
+      
+      // Auto-save to history after generation completes
+      if (!isContinuation) {
+        addToHistory(fullContent, settings);
+      } else {
+        // For continuation, we might want to update the history item or just leave it for user to save
+        // For now, let's keep the simplicity of auto-saving on first full gen
+      }
+      
     } catch (err: any) {
+      if (err.name === 'AbortError') return;
       setStoryState(prev => ({
         ...prev,
-        error: err.message,
+        error: err instanceof StoryGenerationError ? err.message : "সমস্যা হয়েছে।",
+        errorCode: err instanceof StoryGenerationError ? err.code : 'ERR_UNK_99'
       }));
     } finally {
-      setStoryState(prev => ({
-        ...prev,
-        isGenerating: false,
-      }));
+      setStoryState(prev => ({ ...prev, isGenerating: false }));
     }
-  }, [settings, storyState.isGenerating]);
+  }, [settings, storyState]);
 
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
-      <Header />
+      <Header onOpenHistory={() => setIsHistoryOpen(true)} historyCount={history.length} />
       
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* Error Notification Overlay */}
+      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
         {storyState.error && (
-          <div className="fixed bottom-4 right-4 z-[100] bg-red-600 text-white px-6 py-4 rounded-xl shadow-2xl animate-bounce flex items-center space-x-3">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="font-bold">{storyState.error}</span>
-            <button onClick={() => setStoryState(p => ({...p, error: null}))} className="text-white/80 hover:text-white">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-            </button>
+          <div className="fixed bottom-24 lg:bottom-4 right-4 z-[100] max-w-sm bg-white border-l-4 border-red-600 p-4 rounded-r-xl shadow-2xl animate-in slide-in-from-right duration-300">
+            <div className="flex justify-between items-start">
+              <p className="text-sm font-bold text-red-800">{storyState.error}</p>
+              <button onClick={() => setStoryState(p => ({...p, error: null}))} className="text-slate-400">×</button>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1 font-mono">Code: {storyState.errorCode}</p>
           </div>
         )}
 
-        {/* Configuration Sidebar */}
         <Sidebar 
           settings={settings} 
           setSettings={setSettings} 
-          onGenerate={handleGenerate}
+          onGenerate={() => handleGenerate(false)}
           isGenerating={storyState.isGenerating}
         />
 
-        {/* Story Display/Reader Area */}
         <StoryDisplay 
           content={storyState.content} 
           isGenerating={storyState.isGenerating}
           settings={settings}
+          onContinue={() => handleGenerate(true)}
         />
       </main>
 
-      {/* Mobile Sticky CTA */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 z-40">
-        <button
-          onClick={handleGenerate}
-          disabled={storyState.isGenerating}
-          className={`w-full py-3 px-4 rounded-xl font-bold flex items-center justify-center space-x-2 shadow-lg transition-all ${
-            storyState.isGenerating ? 'bg-indigo-400 text-white' : 'bg-indigo-600 text-white'
-          }`}
-        >
-          {storyState.isGenerating ? 'লিখছে...' : 'নতুন গল্প শুরু করুন'}
-        </button>
-      </div>
+      <HistoryPanel 
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        history={history}
+        onLoad={loadFromHistory}
+        onDelete={deleteFromHistory}
+      />
     </div>
   );
 };

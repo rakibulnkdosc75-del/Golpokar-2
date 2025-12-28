@@ -17,16 +17,37 @@ export enum Genre {
   COMEDY = 'হাস্যরসাত্মক (Comedy)'
 }
 
+export enum WritingStyle {
+  CLASSIC = 'ধ্রুপদী (Classic)',
+  MODERN = 'আধুনিক (Modern)',
+  POETIC = 'কাব্যাত্মক (Poetic)',
+  DRAMATIC = 'নাটকীয় (Dramatic)',
+  HUMOROUS = 'রসময় (Humorous)',
+  SATIRICAL = 'ব্যঙ্গাত্মক (Satirical)',
+  HISTORICAL = 'ঐতিহাসিক (Historical)'
+}
+
+export type Theme = 'light' | 'dark' | 'sepia';
+
 export interface StorySettings {
   title: string;
   type: StoryType;
   genre: Genre;
+  style: WritingStyle;
   isMature: boolean;
-  length: 'short' | 'medium' | 'long';
+  length: 'very short' | 'short' | 'medium' | 'long' | 'very long';
 }
 
 export interface StoryState {
   content: string;
   isGenerating: boolean;
   error: string | null;
+  errorCode?: string;
+}
+
+export interface StoryHistoryItem {
+  id: string;
+  timestamp: number;
+  content: string;
+  settings: StorySettings;
 }

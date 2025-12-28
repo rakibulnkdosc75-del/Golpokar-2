@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { StorySettings, StoryType, Genre } from '../types';
+import { StorySettings, StoryType, Genre, WritingStyle } from '../types';
 
 interface SidebarProps {
   settings: StorySettings;
@@ -18,6 +18,14 @@ const Sidebar: React.FC<SidebarProps> = ({ settings, setSettings, onGenerate, is
   const handleToggle = () => {
     setSettings(prev => ({ ...prev, isMature: !prev.isMature }));
   };
+
+  const lengthOptions = [
+    { id: 'very short', label: 'খুব সংক্ষিপ্ত' },
+    { id: 'short', label: 'সংক্ষিপ্ত' },
+    { id: 'medium', label: 'মাঝারি' },
+    { id: 'long', label: 'বিস্তারিত' },
+    { id: 'very long', label: 'খুব বিস্তারিত' },
+  ];
 
   return (
     <div className="w-full lg:w-80 bg-white border-r border-slate-200 p-6 overflow-y-auto space-y-6 h-full shadow-sm">
@@ -62,19 +70,33 @@ const Sidebar: React.FC<SidebarProps> = ({ settings, setSettings, onGenerate, is
       </div>
 
       <div>
+        <label className="block text-sm font-semibold text-slate-700 mb-2">লেখার শৈলী (Style)</label>
+        <select
+          name="style"
+          value={settings.style}
+          onChange={handleInputChange}
+          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none"
+        >
+          {Object.values(WritingStyle).map(style => (
+            <option key={style} value={style}>{style}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
         <label className="block text-sm font-semibold text-slate-700 mb-2">দৈর্ঘ্য (Length)</label>
-        <div className="grid grid-cols-3 gap-2">
-          {['short', 'medium', 'long'].map((len) => (
+        <div className="grid grid-cols-2 gap-2">
+          {lengthOptions.map((opt) => (
             <button
-              key={len}
-              onClick={() => setSettings(prev => ({ ...prev, length: len as any }))}
-              className={`py-2 text-xs font-bold rounded-lg border transition-all ${
-                settings.length === len 
+              key={opt.id}
+              onClick={() => setSettings(prev => ({ ...prev, length: opt.id as any }))}
+              className={`py-2 px-1 text-xs font-bold rounded-lg border transition-all ${
+                settings.length === opt.id 
                 ? 'bg-indigo-600 text-white border-indigo-600' 
                 : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'
-              }`}
+              } ${opt.id === 'very long' ? 'col-span-2' : ''}`}
             >
-              {len === 'short' ? 'সংক্ষিপ্ত' : len === 'medium' ? 'মাঝারি' : 'বিস্তারিত'}
+              {opt.label}
             </button>
           ))}
         </div>
